@@ -1,0 +1,419 @@
+// <bigint> -*- Vss -*-
+
+/** @file Vss/bigint
+ *  This is not a Standard C++ Library header.
+ */
+
+#ifndef VSS_BIGINT__
+#define VSS_BIGINT__
+
+#include "bigint.h"
+
+bigint::bigint()
+{
+    isNegative = false;
+}
+
+bigint::bigint(const char *_str){
+    long long _idx=std::strlen(_str)-1,_end=-1;
+    if(_str[0]=='-')
+    {
+        isNegative = true;
+        _end++;
+    }
+    else
+    {
+        isNegative = false;
+    }
+
+    while(_idx!=_end)
+    {
+#ifdef VSS_BIGINT_DEBUG__
+        assert(std::isdigit(_str[_idx]));
+#endif
+        digits.push_back(_str[_idx]-'0');
+        _idx--;
+    }
+}
+
+bigint::bigint(const std::string &_str)
+{
+    auto _it=_str.rbegin(),_end=_str.rend();
+    if(_str.front()=='-')
+    {
+        isNegative = true;
+        _end--;
+    }
+    else
+    {
+        isNegative = false;
+    }
+
+    while(_it!=_end)
+    {
+#ifdef VSS_BIGINT_DEBUG__
+        assert(std::isdigit(*_it));
+#endif
+        digits.push_back(*_it-'0');
+        _it++;
+    }
+}
+
+bigint::bigint(const bigint &_other)
+{
+    isNegative = _other.isNegative;
+    digits = _other.digits;
+}
+
+bigint::bigint(const float &_num) : bigint((long double)_num) { }
+
+bigint::bigint(const double &_num) : bigint((long double)_num) { }
+
+bigint::bigint(const long double &_num)
+{
+    long double _value = _num;
+    if(_value==0)
+    {
+        digits.push_back(0);
+        return ;
+    }
+    else if(_value<0)
+    {
+        isNegative = true;
+        _value = -_value;
+    }
+    else
+    {
+        isNegative = false;
+    }
+
+    while(_value)
+    {
+        digits.push_back(fmodl(_value,10));
+        _value = (_value-fmodl(_value,10))/10;
+    }
+}
+
+
+template<typename _T=long long>
+bigint::bigint(const _T &_num)
+{
+    _T _value = _num;
+    if(_value==0)
+    {
+        this->isNegative = false;
+        this->digits.push_back(0);
+        return ;
+    }
+    else if(_value<0)
+    {
+        this->isNegative = true;
+        _value = -_value;
+    }
+    else
+    {
+        this->isNegative = false;
+    }
+
+    while(_value)
+    {
+        this->digits.push_back(_value%10);
+        _value /= 10;
+    }
+}
+
+bigint operator"" _bint(unsigned long long _num)
+{
+    return bigint(_num);
+}
+
+bigint operator"" _bint(long double _num)
+{
+    return bigint(_num);
+}
+
+bigint operator"" _bint(const char *_num,unsigned long long int)
+{
+    return bigint(_num);
+}
+
+bigint& bigint::operator=(const bigint &_A)
+{
+    isNegative = _A.isNegative;
+    digits = _A.digits;
+    return *this;
+}
+
+bigint operator+(const bigint &_A)
+{
+    return _A;
+}
+
+bigint operator-(const bigint &_A)
+{
+    if(_A==0)
+    {
+        return _A;
+    }
+    bigint _result=_A;
+    _result.isNegative ^= true;
+    return _result;
+}
+
+bool operator<(const bigint &_A,const bigint &_B)
+{
+    if(_A.digits.size()==1&&_A.digits[0]==0&&_B.digits.size()==1&&_B.digits[0]==0)
+    {
+        return false;
+    }
+    if(_A.isNegative^_B.isNegative)
+    {
+        return _A.isNegative>_B.isNegative;
+    }
+    if(_A.digits.size()!=_B.digits.size())
+    {
+        return _A.digits.size()<_B.digits.size();
+    }
+    return std::lexicographical_compare(_A.digits.rbegin(),_A.digits.rend(),_B.digits.rbegin(),_B.digits.rend());
+}
+
+bool operator>(const bigint &_A,const bigint &_B)
+{
+    return _B<_A;
+}
+
+bool operator<=(const bigint &_A,const bigint &_B)
+{
+    return !(_A<_B);
+}
+
+bool operator>=(const bigint &_A,const bigint &_B)
+{
+    return !(_A>_B);
+}
+
+bool operator==(const bigint &_A, const bigint &_B)
+{
+    return !(_A<_B)&&!(_A>_B);
+}
+
+bool operator!=(const bigint &_A,const bigint &_B)
+{
+    return !(_A==_B);
+}
+
+bigint operator+(const bigint &_A,const bigint &_B)
+{
+    if(!_A.isNegative&&_B.isNegative)
+    {
+        return _A-(-_B);
+    }
+    else if(_A.isNegative&&!_B.isNegative)
+    {
+        return _B-(-_A);
+    }
+
+    bigint _result;
+    _result.isNegative = _A.isNegative;
+
+    int _cnt=0,_cur=0;
+    while(_cnt<std::max(_A.digits.size(),_B.digits.size()))
+    {
+        int _sum=_cur;
+        if(_cnt<_A.digits.size())
+        {
+            _sum += _A.digits[_cnt];
+        }
+        if(_cnt<_B.digits.size())
+        {
+            _sum += _B.digits[_cnt];
+        }
+        _result.digits.push_back(_sum%10);
+        _cur = _sum/10;
+        _cnt++;
+    }
+    if(_cur)
+    {
+        _result.digits.push_back(_cur);
+    }
+    return _result;
+}
+
+const bigint& bigint::operator+=(const bigint &_A)
+{
+    return *this = *this+_A;
+}
+
+const bigint& bigint::operator++()
+{
+    return *this = *this+1;
+}
+
+bigint bigint::operator++(int)
+{
+    return *this = *this+1;
+}
+
+bigint operator-(const bigint &_A,const bigint &_B)
+{
+    if(!_A.isNegative&&_B.isNegative)
+    {
+        return _A+(-_B);
+    }
+    else if(_A.isNegative&&!_B.isNegative)
+    {
+        return -(-_A+_B);
+    }
+
+    bigint _result;
+    if(_A<_B)
+    {
+        _result = _B-_A;
+        _result.isNegative = true;
+        return _result;
+    }
+    else
+    {
+        _result.isNegative = false;
+    }
+
+    int _cnt=0,_cur=0;
+    while(_cnt<_A.digits.size())
+    {
+        _cur += _A.digits[_cnt];
+        if(_cnt<_B.digits.size())
+        {
+            _cur -= _B.digits[_cnt];
+        }
+
+        if(_cur<0)
+        {
+            _result.digits.push_back(_cur+10);
+            _cur = -1;
+        }
+        else
+        {
+            _result.digits.push_back(_cur);
+            _cur = 0;
+        }
+        _cnt++;
+    }
+    _result.removeLeadingZeros();
+    return _result;
+}
+
+const bigint& bigint::operator-=(const bigint &_A)
+{
+    return *this = *this-_A;
+}
+
+const bigint& bigint::operator--()
+{
+    return *this = *this-1;
+}
+
+bigint bigint::operator--(int)
+{
+    return *this = *this-1;
+}
+
+bigint operator*(const bigint &_A,const bigint &_B)
+{
+    if(_A==0||_B==0)
+    {
+        return 0;
+    }
+    else if(_A==1||_B==1)
+    {
+        return _A==1?_B:_A;
+    }
+    else if(_A==-1||_B==-1)
+    {
+        return _A==-1?-_B:-_A;
+    }
+    bigint _result;
+
+    // TODO
+
+    return _result;
+}
+
+std::istream& operator>>(std::istream &_is,bigint &_A)
+{
+    std::string _in;
+    _is >> _in;
+
+    if(*_in.begin()=='-')
+    {
+        _A.isNegative = true;
+    }
+    else
+    {
+        _A.isNegative = false;
+    }
+
+    auto _it=_in.rbegin();
+    _A.digits.clear();
+    while(_it!=(_A.isNegative?--_in.rend():_in.rend()))
+    {
+        _A.digits.push_back(*_it-'0');
+        _it++;
+    }
+    _A.removeLeadingZeros();
+
+    return _is;
+}
+
+std::ostream& operator<<(std::ostream &_os,const bigint &_A)
+{
+    _os << (_A.isNegative?"-":"");
+    for(auto _element=_A.digits.rbegin();_element!=_A.digits.rend();_element++)
+    {
+        _os << (int)*_element;
+    }
+    return _os;
+}
+
+void bigint::e(long long _x)
+{
+    if(x>0)
+    {
+        this->digits.insert(this->digits.begin(),x,0);
+    }
+    else if(x<0)
+    {
+        this->digits.erase(this->digits.begin(),this->digits.begin()+std::min(std::size_t(-x),this->digits.size()));
+        if(this->digits.size()==0)
+        {
+            this->digits.push_back(0);
+        }
+    }
+}
+
+const bigint& bigint::e(const bigint &_A,long long _x)
+{
+    bigint _result=_A;
+    if(x>0)
+    {
+        _result.digits.insert(_result.digits.begin(),x,0);
+    }
+    else if(x<0)
+    {
+        _result.digits.erase(_result.digits.begin(),_result.digits.begin()+std::min(std::size_t(-x),_result.digits.size()));
+        if(_result.digits.size()==0)
+        {
+            _result.digits.push_back(0);
+        }
+    }
+    return _result;
+}
+
+void bigint::removeLeadingZeros()
+{
+    while(digits.size()>1&&digits.back()==0)
+    {
+        digits.pop_back();
+    }
+}
+
+#endif
