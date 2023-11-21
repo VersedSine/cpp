@@ -1,0 +1,322 @@
+// <Trie> -*- Vss -*-
+
+/** @file Vss/bigint.h
+ */
+
+#ifndef VSS_TRIE
+#define VSS_TRIE
+
+#include <bitset>
+#include <string>
+#include <vector>
+#include <utility>
+//#include <corecrt.h>
+#include <stdexcept>
+
+namespace Vss{
+
+template<typename _Tp>
+class Trie{
+private:
+    typedef std::string _Key;
+
+    constexpr static size_t _size=128,_edIdx=128;
+
+public:
+    class node{
+    public:
+        _Tp _value;
+        node *_fa;
+        node *_son[_size];
+        std::bitset<_size+1>_b;
+        size_t _num=0;
+
+        node() : _value(_Tp()),_fa(nullptr),_b(0ULL),_num(0ULL) {
+            for(int __i=0;__i<_size;__i++) _son[__i] = nullptr;
+        }
+        node(node *fa) : _fa(fa) { }
+    };
+
+    class iterator{
+    public:
+        _Key _key;
+        node *_p;
+
+        iterator() = default;
+        iterator(_Key key,node *p) : _key(key),_p(p) { }
+        
+        std::pair<_Key,_Tp> operator*()const{
+            return {_key,_p->_value};
+        }
+
+        bool operator==(const iterator &__it){
+            return this->_p==__it->_p;
+        }
+
+        bool operator!=(const iterator &__it){
+            return !(*this==__it);
+        }
+
+        /*iterator operator++(){
+            iterator __res=*this;
+            if(this->_p->_num-this->_p->_b[_edIdx]>0){
+                node *__p=this->_p;
+                _Key _key=_Key();
+                do{
+                    _key += __itc(__p->_b._Find_first());
+                    __p = __p->_son[__p->_b._Find_first()];
+                }while(!__p->_b[_edIdx]);
+                return {_key,__p};
+            }else{
+                //TODO
+            }
+        }
+
+        iterator operator++(int){
+            return (*this)++;
+        }*/
+    };
+
+private:
+    node _Root;
+
+public:
+    Trie(){
+        _Root = node();
+    }
+
+    iterator begin(){
+        if(_Root._num==0) return {_Key(),nullptr};
+        node *__p=&_Root;
+        _Key _key=_Key();
+        while(__p->_num-__p->_b[_edIdx]>=0){
+            if(__p->_b[_edIdx]) break;
+            _key += __itc(__p->_b._Find_first());
+            __p = __p->_son[__p->_b._Find_first()];
+            //for(int __i=0;__i<_edIdx;__i++){
+            //    if(__p->_b[__i]){__p = __p->son[__i];_key += __itc(__i);break;}
+            //}
+        }return {_key,__p};
+    }
+
+    //Point to the last element,not to the element after the last element
+    iterator end(){
+        if(_Root._num==0) return {_Key(),nullptr};
+        node *__p=&_Root;
+        _Key _key=_Key();
+        while(__p->_num-__p->_b[_edIdx]>0){
+            for(int __i=_edIdx-1;~__i;__i--){
+                if(__p->_b[__i]){__p = __p->_son[__i];_key += __itc(__i);break;}
+            }
+        }return {_key,__p};
+    }
+
+private:
+    int __cti(char __c)const{
+        return ('0'<=__c&&__c<='9'?__c-'0':
+               ('A'<=__c&&__c<='Z'?__c-'A'+10:
+               ('a'<=__c&&__c<='z'?__c-'a'+36:throw std::runtime_error("the input character is not an upper case,lower case or number"))));
+    }
+    
+    char __itc(int __x)const{
+        return (0<=__x&&__x<=9?__x+'0':
+               (10<=__x&&__x<=35?__x-10+'A':
+               (36<=__x&&__x<=61?__x-36+'a':throw std::runtime_error("the input number is out of range"))));
+    }
+    
+public:
+    //if cannot find,it will add the __k
+    node* __find_p(const _Key &__k){
+        node *__res=&_Root;
+        for(char __c:__k){
+            if(!__res->_b[__cti(__c)]) __res->_b[__cti(__c)] = true,__res->_son[__cti(__c)] = new node(__res);
+            __res = __res->_son[__cti(__c)];
+        }
+        if(__res->_b[_edIdx]==false){
+            __res->_b[_edIdx] = true;
+            node *__p=__res;
+            while(__p!=nullptr) __p->_num++,__p = __p->_fa;
+        }
+        return __res;
+    }
+
+    _Tp& operator[](const _Key &__k){
+        return __find_p(__k)->_value;
+    }
+    
+    void insert(const _Key &__k,const _Tp &__x){
+        __find_p(__k)->_value = __x;
+    }
+
+    bool count(const _Key &__k){
+        node *__p=&_Root;
+        for(char __c:__k){
+            if(!__p->_b[__cti(__c)]) return false;
+            __p = __p->_son[__cti(__c)];
+        }return __p->_b[_edIdx];
+    }
+
+    size_t count_prefix(_Key __k){
+        node *__p=&_Root;
+        for(char __c:__k){
+            if(!__p->_b[__cti(__c)]) return 0;
+            __p = __p->_son[__cti(__c)];
+        }return __p->_num;
+    }
+
+    _Tp find(const _Key &__k){
+        return __find_p(__k)->_value;
+    }
+
+    void erase(const _Key &__k){
+        node *__p=&_Root;
+        for(char __c:__k){
+            __p->_num--;
+            if(__p->_son[__cti(__c)]->_num==1){
+                __p->_b[__cti(__c)] = false;
+                __p->_son[__cti(__c)] = nullptr;
+                return ;
+            }
+            __p = __p->_son[__cti(__c)];
+        }
+        __p->_b[_edIdx] = false;
+        //__p->_value = _Tp();
+    }
+
+    std::vector<_Tp>* traversal(node *__p=nullptr,std::vector<_Tp>*__res=new std::vector<_Tp>){
+        if(__p==nullptr) __p = &_Root;
+        if(__p->_b[_edIdx]) __res->push_back(__p->_value);
+        for(int __i=__p->_b._Find_first();__i<_edIdx;__i = __p->_b._Find_next(__i)){
+            traversal(__p->_son[__i],__res);
+        }return __res;
+    }
+};
+
+/*template<typename _Tp,size_t _Deep>
+class Trie_by_array{
+public:
+    typedef std::string _Key;
+
+    class iterator{
+    public:
+        _Key _key;
+        _Tp _val;
+
+        iterator() = default;
+        
+        std::pair<_Key,_Tp> operator*()const{
+            return {_key,_val};
+        }
+
+        bool operator==(const iterator &__it){
+            return _key==__it._key&&_val==__it._val;
+        }
+
+        bool operator!=(const iterator &__it){
+            return !(*this==__it);
+        }
+    };
+
+private:
+
+    constexpr static size_t _size=128,_edIdx=128;
+    int _M_t[128*_Deep][_size+1];
+    int _tot=0;
+    std::vector<_Tp>_v;
+    iterator _begin_it,_end_it;
+
+public:
+    Trie_by_array(){
+        for(int __i=0;__i<_size*_Deep;__i++){
+            for(int __j=0;__j<=_edIdx;__j++) _M_t[__i][__j] = 0;
+            _M_t[__i][_edIdx] = -1;
+        }
+        _tot = 0;
+        _begin_it = iterator();
+        _end_it = iterator();
+    }
+
+    iterator begin(){
+        if(_tot==0) return {"",_Tp()};
+        int __p=0;
+        _Key _key=_Key();
+        while(!~_M_t[__p][_edIdx]){
+            for(int __i=0;__i<_edIdx;__i++){
+                if(_M_t[__p][__i]){__p = _M_t[__p][__i];_key += __itc(__i);break;}
+            }
+        }return {_key,_v[_M_t[__p][_edIdx]]};
+    }
+
+    //Point to the last element,not to the element after the last element
+    iterator end(){
+        if(_tot==0) return {"",_Tp()};
+        bool isEmpty=false;
+        int __p=0;
+        _Key _key=_Key();
+        while(!isEmpty){
+            isEmpty = true;
+            for(int __i=_edIdx-1;~__i;__i--){
+                if(_M_t[__p][__i]){__p = _M_t[__p][__i];_key += __itc(__i);isEmpty = false;break;}
+            }
+            if(isEmpty&&~_M_t[__p][_edIdx]){break;}
+        }return {_key,_v[_M_t[__p][_edIdx]]};
+    }
+
+private:
+    int __cti(char __c)const{
+        //return ('0'<=__c&&__c<='9'?__c-'0':
+        //       ('A'<=__c&&__c<='Z'?__c-'A'+10:
+        //       ('a'<=__c&&__c<='z'?__c-'a'+36:throw std::runtime_error("the input character is not an upper case,lower case or number"))));
+        return __c;
+    }
+    
+    char __itc(int __x)const{
+        //return (0<=__x&&__x<=9?__x+'0':
+        //       (10<=__x&&__x<=35?__x-10+'A':
+        //       (36<=__x&&__x<=61?__x-36+'a':throw std::runtime_error("the input number is out of range"))));
+        return __x;
+    }
+
+    int __find_p(const _Key &__k){
+        int __p=0;
+        for(char __c:__k){
+            if(_M_t[__p][__cti(__c)]==0) __p = _M_t[__p][__cti(__c)] = ++_tot;
+            else __p = _M_t[__p][__cti(__c)];
+        }return __p;
+    }
+    
+public:
+
+    void insert(const _Key &__k,const _Tp &__x){
+        _M_t[__find_p(__k)][_edIdx] = _v.size();
+        _v.push_back(__x);
+    }
+
+    _Tp find(const _Key &__k){
+        int __p=_M_t[__find_p(__k)][_edIdx];
+        return __p<_v.size()?_v[__p]:_Tp();
+    }
+
+    bool count(const _Key &__k){
+        int __p=0;
+        for(char __c:__k){
+            if(_M_t[__p][__cti(__c)]==0) return false;
+            else __p = _M_t[__p][__cti(__c)];
+        }return ~_M_t[__p][_edIdx];
+    }
+
+    void erase(const _Key &__k){
+        _M_t[__find_p(__k)][_edIdx] = -1;
+    }
+
+    std::vector<_Tp>* traversal(int __p=0,std::vector<_Tp>*__res=new std::vector<_Tp>){
+        if(~_M_t[__p][_edIdx]) __res->push_back(_v[_M_t[__p][_edIdx]]);
+        for(int __i=0;__i<_edIdx;__i++){
+            if(_M_t[__p][__i]) traversal(_M_t[__p][__i],__res);
+        }return __res;
+    }
+};*/
+
+}
+
+#endif
